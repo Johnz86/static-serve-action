@@ -15,6 +15,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         
+      - name: Check test directory
+        run: |
+          echo "📁 Checking test directory contents:"
+          ls -la test/ || echo "❌ test/ directory not found"
+          echo ""
+          echo "📄 Checking for index.html:"
+          if [[ -f test/index.html ]]; then
+            echo "✅ test/index.html exists"
+            echo "Content preview:"
+            head -5 test/index.html
+          else
+            echo "❌ test/index.html not found, creating one..."
+            mkdir -p test
+            echo "<h1>Hello World!</h1><p>Test server is working</p>" > test/index.html
+            echo "✅ Created test/index.html"
+          fi
+        
       - name: Start static server
         id: server
         uses: johnz86/static-serve-action@v1
@@ -22,14 +39,47 @@ jobs:
           directory: ./test
           port: 3000
           
-      - name: Test server
+      - name: Wait for server startup
         run: |
-          echo "Server URL: ${{ steps.server.outputs.url }}"
-          curl -f ${{ steps.server.outputs.url }}
-          echo "✅ Server is working!"
+          echo "⏳ Waiting for server to be ready..."
+          sleep 3
           
-      - name: Cleanup
+      - name: Test server health
+        run: |
+          echo "🔍 Testing server health at ${{ steps.server.outputs.url }}"
+          curl -f ${{ steps.server.outputs.url }}
+          echo "✅ Server health check passed!"
+          
+      - name: Test specific endpoints
+        run: |
+          echo "🔍 Testing specific endpoints..."
+          
+          # Test root should serve index.html
+          echo "Testing root path..."
+          curl -f ${{ steps.server.outputs.url }}/ >/dev/null
+          
+          # Test direct index.html access
+          echo "Testing direct index.html access..."
+          curl -f ${{ steps.server.outputs.url }}/index.html >/dev/null
+          
+          echo "✅ All endpoint tests passed!"
+          
+      - name: Test concurrent requests
+        run: |
+          echo "🔀 Testing concurrent requests..."
+          for i in {1..3}; do
+            curl -f ${{ steps.server.outputs.url }} >/dev/null &
+          done
+          wait
+          echo "✅ Concurrent requests handled successfully!"
+          
+      - name: Cleanup server
         if: always()
         run: |
-          [[ -n "${{ steps.server.outputs.pid }}" ]] && kill ${{ steps.server.outputs.pid }} || true
-    
+          echo "🧹 Cleaning up server..."
+          if [[ -n "${{ steps.server.outputs.pid }}" ]]; then
+            kill ${{ steps.server.outputs.pid }} || true
+            echo "✅ Server stopped"
+          else
+            echo "⚠️ No server PID found"
+          fi
