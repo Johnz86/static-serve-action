@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.target }}
+    name: Build for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -16,59 +16,41 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             binary_name: static-serve-action-linux-x64
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-            binary_name: static-serve-action-linux-arm64
           - os: macos-latest
             target: x86_64-apple-darwin
             binary_name: static-serve-action-macos-x64
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            binary_name: static-serve-action-macos-arm64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             binary_name: static-serve-action-windows-x64.exe
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       
-      - name: Install cross-compilation tools
-        if: matrix.target == 'aarch64-unknown-linux-musl'
+      - name: Install musl tools (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y musl-tools musl-dev
           
-      - name: Build binary
-        run: |
-          if [[ "${{ matrix.target }}" == *"musl"* ]]; then
-            if [[ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" ]]; then
-              export CC_aarch64_unknown_linux_musl=aarch64-linux-gnu-gcc
-              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc
-            fi
-            cargo build --release --target ${{ matrix.target }}
-          else
-            cargo build --release --target ${{ matrix.target }}
-          fi
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
           
-      - name: Prepare binary
+      - name: Prepare binary (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cp target/${{ matrix.target }}/release/static-serve-action.exe ${{ matrix.binary_name }}
-            strip ${{ matrix.binary_name }} || true
-          else
-            cp target/${{ matrix.target }}/release/static-serve-action ${{ matrix.binary_name }}
-            strip ${{ matrix.binary_name }}
-          fi
+          cp target/${{ matrix.target }}/release/static-serve-action ${{ matrix.binary_name }}
+          strip ${{ matrix.binary_name }}
           
-      - name: Verify binary
+      - name: Prepare binary (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
-          ls -la ${{ matrix.binary_name }}
-          file ${{ matrix.binary_name }} || true
+          copy target\${{ matrix.target }}\release\static-serve-action.exe ${{ matrix.binary_name }}
           
       - name: Upload binary
         uses: actions/upload-artifact@v4
@@ -82,19 +64,12 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     
     steps:
-      - name: Download all binaries
+      - name: Download binaries
         uses: actions/download-artifact@v4
-        
-      - name: List downloaded binaries
-        run: |
-          find . -name "static-serve-action-*" -type f -exec ls -la {} \;
         
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            */static-serve-action-*
-          draft: false
-          prerelease: false
+          files: '*/static-serve-action-*'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
