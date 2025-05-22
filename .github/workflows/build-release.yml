@@ -15,19 +15,19 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            binary_name: static-server-linux-x64
+            binary_name: static-serve-action-linux-x64
           - os: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            binary_name: static-server-linux-arm64
+            binary_name: static-serve-action-linux-arm64
           - os: macos-latest
             target: x86_64-apple-darwin
-            binary_name: static-server-macos-x64
+            binary_name: static-serve-action-macos-x64
           - os: macos-latest
             target: aarch64-apple-darwin
-            binary_name: static-server-macos-arm64
+            binary_name: static-serve-action-macos-arm64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            binary_name: static-server-windows-x64.exe
+            binary_name: static-serve-action-windows-x64.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -58,12 +58,17 @@ jobs:
       - name: Prepare binary
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cp target/${{ matrix.target }}/release/static-server.exe ${{ matrix.binary_name }}
+            cp target/${{ matrix.target }}/release/static-serve-action.exe ${{ matrix.binary_name }}
             strip ${{ matrix.binary_name }} || true
           else
-            cp target/${{ matrix.target }}/release/static-server ${{ matrix.binary_name }}
+            cp target/${{ matrix.target }}/release/static-serve-action ${{ matrix.binary_name }}
             strip ${{ matrix.binary_name }}
           fi
+          
+      - name: Verify binary
+        run: |
+          ls -la ${{ matrix.binary_name }}
+          file ${{ matrix.binary_name }} || true
           
       - name: Upload binary
         uses: actions/upload-artifact@v4
@@ -80,11 +85,15 @@ jobs:
       - name: Download all binaries
         uses: actions/download-artifact@v4
         
+      - name: List downloaded binaries
+        run: |
+          find . -name "static-serve-action-*" -type f -exec ls -la {} \;
+        
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            */static-server-*
+            */static-serve-action-*
           draft: false
           prerelease: false
         env:

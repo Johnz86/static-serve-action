@@ -7,15 +7,12 @@ use std::thread;
 
 #[derive(Parser)]
 struct Args {
-    /// Directory to serve
     #[arg(short = 'd', long, default_value = ".")]
     path: String,
     
-    /// Port to serve on
     #[arg(short = 'p', long, default_value = "8080")]
     port: u16,
     
-    /// Host to bind to
     #[arg(long, default_value = "127.0.0.1")]
     host: String,
 }

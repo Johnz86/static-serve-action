@@ -10,7 +10,7 @@ jobs:
       
       - name: Start static server
         id: server
-        uses: johnz86/static-server-action@v1
+        uses: johnz86/static-serve-action@v1
         with:
           directory: './test'
           port: '3000'

@@ -14,7 +14,7 @@ Ultra-minimal memory footprint static file server for GitHub Actions, built with
 
 ```yaml
 - name: Start static server
-  uses: johnz86/static-server-action@v1
+  uses: johnz86/static-serve-action@v1
   with:
     directory: './test'    # Optional, defaults to '.'
     port: '8080'           # Optional, defaults to '8080'
