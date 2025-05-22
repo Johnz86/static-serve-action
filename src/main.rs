@@ -8,7 +8,7 @@ use std::thread;
 #[derive(Parser)]
 struct Args {
     #[arg(short = 'd', long, default_value = ".")]
-    path: String,
+    directory: String,
     
     #[arg(short = 'p', long, default_value = "8080")]
     port: u16,
@@ -22,13 +22,13 @@ fn main() {
     let addr = format!("{}:{}", args.host, args.port);
     
     println!("🚀 Static server starting at http://{}", addr);
-    println!("📁 Serving directory: {}", args.path);
+    println!("📁 Serving directory: {}", args.directory);
     
     let listener = TcpListener::bind(&addr).unwrap();
     
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        let serve_path = args.path.clone();
+        let serve_path = args.directory.clone();
         
         thread::spawn(move || {
             handle_connection(stream, &serve_path);

@@ -7,7 +7,7 @@ branding:
   color: 'blue'
 
 inputs:
-  path:
+  directory:
     description: 'Directory to serve static files from'
     required: false
     default: '.'
@@ -46,7 +46,7 @@ runs:
           *)            echo "::error::Unsupported platform: $RUNNER_OS-$RUNNER_ARCH"; exit 1 ;;
         esac
         
-        BINARY_URL="https://github.com/johnz86/static-serve-action/releases/latest/download/static-serve-action-$URL_SUFFIX"
+        BINARY_URL="https://github.com/johnz86/static-server-action/releases/latest/download/static-serve-action-$URL_SUFFIX"
         BINARY_NAME="static-serve-action$([[ "$RUNNER_OS" == "Windows" ]] && echo ".exe" || echo "")"
         
         echo "::notice::Downloading $BINARY_NAME for $RUNNER_OS-$RUNNER_ARCH"
@@ -56,8 +56,8 @@ runs:
     - name: Validate inputs
       shell: bash
       run: |
-        if [[ ! -d "${{ inputs.path }}" ]]; then
-          echo "::error::Directory not found: ${{ inputs.path }}"
+        if [[ ! -d "${{ inputs.directory }}" ]]; then
+          echo "::error::Directory not found: ${{ inputs.directory }}"
           exit 1
         fi
         
@@ -76,10 +76,10 @@ runs:
         SERVER_URL="http://localhost:${{ inputs.port }}"
         
         echo "::notice::Starting server at $SERVER_URL"
-        echo "::notice::Serving: ${{ inputs.path }}"
+        echo "::notice::Serving: ${{ inputs.directory }}"
         
         # Start server in background
-        ./"$BINARY_NAME" -d "${{ inputs.path }}" -p "${{ inputs.port }}" --host "${{ inputs.host }}" &
+        ./"$BINARY_NAME" -d "${{ inputs.directory }}" -p "${{ inputs.port }}" --host "${{ inputs.host }}" &
         SERVER_PID=$!
         
         # Wait and verify
