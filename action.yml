@@ -46,7 +46,7 @@ runs:
           *)            echo "::error::Unsupported platform: $RUNNER_OS-$RUNNER_ARCH"; exit 1 ;;
         esac
         
-        BINARY_URL="https://github.com/johnz86/static-server-action/releases/latest/download/static-serve-action-$URL_SUFFIX"
+        BINARY_URL="https://github.com/Johnz86/static-serve-action/releases/latest/download/static-serve-action-$URL_SUFFIX"
         BINARY_NAME="static-serve-action$([[ "$RUNNER_OS" == "Windows" ]] && echo ".exe" || echo "")"
         
         echo "::notice::Downloading $BINARY_NAME for $RUNNER_OS-$RUNNER_ARCH"
