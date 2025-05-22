@@ -1,0 +1,17 @@
+[package]
+name = "static-serve-action"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.45.0", features = ["full"] }
+warp = { version = "0.3.7", features = ["compression"] }
+clap = { version = "4.5.38", features = ["derive"] }
+mime_guess = "2.0.5"
+tokio-util = { version = "0.7.15", features = ["io"] }
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"

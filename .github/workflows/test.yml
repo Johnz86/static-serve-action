@@ -1,0 +1,32 @@
+name: Test with Rust Static Server
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Start static server
+        id: server
+        uses: johnz86/static-server-action@v1
+        with:
+          directory: './test'
+          port: '3000'
+      
+      - name: Test server
+        run: |
+          echo "Server URL: ${{ steps.server.outputs.server-url }}"
+          curl -f ${{ steps.server.outputs.server-url }}
+          
+      - name: Run memory-intensive scraping
+        run: |
+          echo "Running tests against lightweight server"
+          
+      - name: Cleanup server
+        if: always()
+        run: |
+          if [[ -n "${{ steps.server.outputs.server-pid }}" ]]; then
+            kill ${{ steps.server.outputs.server-pid }} || true
+          fi

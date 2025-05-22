@@ -1,0 +1,130 @@
+name: 'Rust Static Server (Binary)'
+description: 'Ultra-minimal static file server using pre-compiled Rust binary'
+author: 'johnz86'
+branding:
+  icon: 'server'
+  color: 'orange'
+
+inputs:
+  directory:
+    description: 'Directory to serve static files from'
+    required: false
+    default: '.'
+  port:
+    description: 'Port to serve on'
+    required: false
+    default: '8080'
+  host:
+    description: 'Host to bind to (127.0.0.1 for localhost only, 0.0.0.0 for all interfaces)'
+    required: false
+    default: '127.0.0.1'
+
+outputs:
+  server-url:
+    description: 'URL where the static server is running'
+  server-pid:
+    description: 'Process ID of the running server (for cleanup)'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Download static server binary
+      shell: bash
+      run: |
+        echo "🔽 Downloading Rust static server binary..."
+        
+        # Determine OS and architecture
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          if [[ "$RUNNER_ARCH" == "X64" ]]; then
+            BINARY_URL="https://github.com/johnz86/static-server-action/releases/latest/download/static-server-linux-x64"
+            BINARY_NAME="static-server"
+          elif [[ "$RUNNER_ARCH" == "ARM64" ]]; then
+            BINARY_URL="https://github.com/johnz86/static-server-action/releases/latest/download/static-server-linux-arm64"
+            BINARY_NAME="static-server"
+          else
+            echo "❌ Unsupported Linux architecture: $RUNNER_ARCH"
+            exit 1
+          fi
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          if [[ "$RUNNER_ARCH" == "X64" ]]; then
+            BINARY_URL="https://github.com/johnz86/static-server-action/releases/latest/download/static-server-macos-x64"
+            BINARY_NAME="static-server"
+          elif [[ "$RUNNER_ARCH" == "ARM64" ]]; then
+            BINARY_URL="https://github.com/johnz86/static-server-action/releases/latest/download/static-server-macos-arm64"
+            BINARY_NAME="static-server"
+          else
+            echo "❌ Unsupported macOS architecture: $RUNNER_ARCH"
+            exit 1
+          fi
+        elif [[ "$RUNNER_OS" == "Windows" ]]; then
+          BINARY_URL="https://github.com/johnz86/static-server-action/releases/latest/download/static-server-windows-x64.exe"
+          BINARY_NAME="static-server.exe"
+        else
+          echo "❌ Unsupported operating system: $RUNNER_OS"
+          exit 1
+        fi
+        
+        echo "📥 Downloading from: $BINARY_URL"
+        curl -L -f "$BINARY_URL" -o "$BINARY_NAME"
+        chmod +x "$BINARY_NAME"
+        echo "✅ Binary downloaded successfully"
+
+    - name: Validate directory
+      shell: bash
+      run: |
+        if [[ ! -d "${{ inputs.directory }}" ]]; then
+          echo "❌ Error: Directory '${{ inputs.directory }}' does not exist"
+          exit 1
+        fi
+        echo "📁 Serving directory: ${{ inputs.directory }}"
+
+    - name: Start static server
+      shell: bash
+      run: |
+        echo "🚀 Starting Rust static server..."
+        echo "📁 Directory: ${{ inputs.directory }}"
+        echo "🌐 Host: ${{ inputs.host }}"
+        echo "🔌 Port: ${{ inputs.port }}"
+        
+        # Determine binary name based on OS
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          BINARY_NAME="static-server.exe"
+        else
+          BINARY_NAME="static-server"
+        fi
+        
+        # Start server in background
+        ./"$BINARY_NAME" -d "${{ inputs.directory }}" -p "${{ inputs.port }}" --host "${{ inputs.host }}" &
+        SERVER_PID=$!
+        
+        # Store PID for cleanup
+        echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+        
+        # Wait for server to start
+        sleep 3
+        
+        # Verify server is running
+        if ! kill -0 $SERVER_PID 2>/dev/null; then
+          echo "❌ Failed to start server"
+          exit 1
+        fi
+        
+        SERVER_URL="http://localhost:${{ inputs.port }}"
+        echo "✅ Server started successfully at $SERVER_URL"
+        
+        # Set outputs
+        echo "server-url=$SERVER_URL" >> $GITHUB_OUTPUT
+        echo "server-pid=$SERVER_PID" >> $GITHUB_OUTPUT
+        
+        # Test server responsiveness
+        for i in {1..5}; do
+          if curl -s -f "$SERVER_URL" > /dev/null 2>&1; then
+            echo "🌐 Server is responding"
+            break
+          elif [[ $i -eq 5 ]]; then
+            echo "⚠️  Server may not be fully ready yet, but process is running"
+          else
+            echo "⏳ Waiting for server to respond... (attempt $i/5)"
+            sleep 1
+          fi
+        done

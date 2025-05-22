@@ -1,0 +1,14 @@
+*.md eol=lf
+*.sh eol=lf
+*.env eol=lf
+*.template eol=lf
+*.lock eol=lf
+*.toml eol=lf
+*.yml eol=lf
+*.yaml eol=lf
+.python-version eol=lf
+LICENCE eol=lf
+Dockerfile eol=lf
+.dockerignore eol=lf
+.gitignore eol=lf
+.gitattributes eol=lf
