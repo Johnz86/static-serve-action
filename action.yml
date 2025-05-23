@@ -1,5 +1,5 @@
 name: 'Static Server Action'
-description: 'Ultra-minimal Rust-based static file server for testing'
+description: 'Ultra-minimal Rust-based static file server for GitHub Actions testing'
 author: 'johnz86'
 
 branding:
@@ -12,7 +12,7 @@ inputs:
     required: false
     default: '.'
   port:
-    description: 'Port to serve on'
+    description: 'Port to serve on (1-65535)'
     required: false
     default: '8080'
   host:
@@ -24,85 +24,142 @@ outputs:
   url:
     description: 'Server URL'
     value: ${{ steps.start-server.outputs.url }}
-  pid:
-    description: 'Server process ID'
-    value: ${{ steps.start-server.outputs.pid }}
 
 runs:
   using: 'composite'
   steps:
-    - name: Download binary
+    - name: Setup
+      id: setup
       shell: bash
       run: |
-        set -e
+        echo "::group::🔧 Configuring Static Server"
         
-        # Determine platform
-        case "$RUNNER_OS-$RUNNER_ARCH" in
-          Linux-X64)    URL_SUFFIX="linux-x64" ;;
-          Linux-ARM64)  URL_SUFFIX="linux-arm64" ;;
-          macOS-X64)    URL_SUFFIX="macos-x64" ;;
-          macOS-ARM64)  URL_SUFFIX="macos-arm64" ;;
-          Windows-X64)  URL_SUFFIX="windows-x64.exe" ;;
-          *)            echo "::error::Unsupported platform: $RUNNER_OS-$RUNNER_ARCH"; exit 1 ;;
-        esac
-        
-        BINARY_URL="https://github.com/Johnz86/static-serve-action/releases/latest/download/static-serve-action-$URL_SUFFIX"
-        BINARY_NAME="static-serve-action$([[ "$RUNNER_OS" == "Windows" ]] && echo ".exe" || echo "")"
-        
-        echo "::notice::Downloading $BINARY_NAME for $RUNNER_OS-$RUNNER_ARCH"
-        curl -fsSL "$BINARY_URL" -o "$BINARY_NAME"
-        chmod +x "$BINARY_NAME"
-
-    - name: Validate inputs
-      shell: bash
-      run: |
+        # Validate directory
         if [[ ! -d "${{ inputs.directory }}" ]]; then
           echo "::error::Directory not found: ${{ inputs.directory }}"
           exit 1
         fi
+        echo "📁 Directory: ${{ inputs.directory }}"
         
+        # Validate port
         if ! [[ "${{ inputs.port }}" =~ ^[0-9]+$ ]] || (( ${{ inputs.port }} < 1 || ${{ inputs.port }} > 65535 )); then
           echo "::error::Invalid port: ${{ inputs.port }}. Must be 1-65535"
           exit 1
         fi
+        echo "🔌 Port: ${{ inputs.port }}"
+        echo "🌐 Host: ${{ inputs.host }}"
+        
+        # Determine platform
+        case "${{ runner.os }}-${{ runner.arch }}" in
+          Linux-X64)     PLATFORM="linux-x64" ;;
+          Linux-ARM64)   PLATFORM="linux-arm64" ;;
+          macOS-X64)     PLATFORM="macos-x64" ;;
+          macOS-ARM64)   PLATFORM="macos-arm64" ;;
+          Windows-X64)   PLATFORM="windows-x64.exe" ;;
+          *)
+            echo "::error::Unsupported platform: ${{ runner.os }}-${{ runner.arch }}"
+            exit 1
+            ;;
+        esac
+        
+        BINARY_NAME="static-serve-action$([[ "${{ runner.os }}" == "Windows" ]] && echo ".exe" || echo "")"
+        TOOLS_DIR="${{ runner.temp }}/static-serve-action"
+        mkdir -p "$TOOLS_DIR"
+        
+        echo "💻 Platform: ${{ runner.os }}-${{ runner.arch }} ($PLATFORM)"
+        echo "🔨 Binary: $BINARY_NAME"
+        
+        echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+        echo "binary-name=$BINARY_NAME" >> "$GITHUB_OUTPUT"
+        echo "tools-dir=$TOOLS_DIR" >> "$GITHUB_OUTPUT"
+        
+        echo "::endgroup::"
+
+    - name: Cache server binary
+      id: cache-binary
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.setup.outputs.tools-dir }}
+        key: static-serve-action-${{ steps.setup.outputs.platform }}-${{ hashFiles('**/action.yml') }}
+
+    - name: Download server
+      if: steps.cache-binary.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "::group::📥 Downloading Server Binary"
+        
+        cd "${{ steps.setup.outputs.tools-dir }}"
+        DOWNLOAD_URL="https://github.com/Johnz86/static-serve-action/releases/latest/download/static-serve-action-${{ steps.setup.outputs.platform }}"
+        
+        echo "🔗 Source: $DOWNLOAD_URL"
+        echo "📦 Size: ~486KB"
+        
+        curl -fsSL "$DOWNLOAD_URL" -o "${{ steps.setup.outputs.binary-name }}"
+        chmod +x "${{ steps.setup.outputs.binary-name }}"
+        
+        # Show file info
+        if command -v file &> /dev/null; then
+          echo "📄 Binary info: $(file "${{ steps.setup.outputs.binary-name }}")"
+        fi
+        
+        echo "✅ Download complete!"
+        echo "::endgroup::"
+
+    - name: Use cached server
+      if: steps.cache-binary.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        echo "::group::♻️  Using Cached Server"
+        echo "✨ Found cached binary at: ${{ steps.setup.outputs.tools-dir }}/${{ steps.setup.outputs.binary-name }}"
+        echo "🚀 Skipping download - ready to serve!"
+        echo "::endgroup::"
 
     - name: Start server
       id: start-server
       shell: bash
       run: |
-        set -e
+        echo "::group::🚀 Starting Static Server"
         
-        BINARY_NAME="static-serve-action$([[ "$RUNNER_OS" == "Windows" ]] && echo ".exe" || echo "")"
-        SERVER_URL="http://localhost:${{ inputs.port }}"
+        BINARY_PATH="${{ steps.setup.outputs.tools-dir }}/${{ steps.setup.outputs.binary-name }}"
+        SERVER_URL="http://${{ inputs.host }}:${{ inputs.port }}"
         
-        echo "::notice::Starting server at $SERVER_URL"
-        echo "::notice::Serving: ${{ inputs.directory }}"
+        # Start server in background (it will print its own nice logs)
+        "$BINARY_PATH" \
+          --directory "${{ inputs.directory }}" \
+          --port "${{ inputs.port }}" \
+          --host "${{ inputs.host }}" &
         
-        # Start server in background
-        ./"$BINARY_NAME" -d "${{ inputs.directory }}" -p "${{ inputs.port }}" --host "${{ inputs.host }}" &
         SERVER_PID=$!
         
-        # Wait and verify
-        sleep 2
-        if ! kill -0 "$SERVER_PID" 2>/dev/null && [[ "$RUNNER_OS" != "Windows" ]]; then
+        # Quick sanity check
+        sleep 0.5
+        if [[ "${{ runner.os }}" != "Windows" ]] && ! kill -0 "$SERVER_PID" 2>/dev/null; then
           echo "::error::Server failed to start"
           exit 1
         fi
-        
-        # Test connectivity
-        for i in {1..10}; do
-          if curl -fsSL --max-time 2 "$SERVER_URL" >/dev/null 2>&1; then
-            echo "::notice::Server is ready"
-            break
-          elif [[ $i -eq 10 ]]; then
-            echo "::warning::Server started but may not be responding yet"
-          else
-            sleep 1
-          fi
-        done
-        
-        # Set outputs and environment
+
         echo "url=$SERVER_URL" >> "$GITHUB_OUTPUT"
-        echo "pid=$SERVER_PID" >> "$GITHUB_OUTPUT"
         echo "STATIC_SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
         echo "STATIC_SERVER_URL=$SERVER_URL" >> "$GITHUB_ENV"
+        
+        echo "::endgroup::"
+
+post:
+  using: 'composite'
+  steps:
+    - name: Stop server
+      shell: bash
+      run: |
+        if [[ -n "$STATIC_SERVER_PID" ]]; then
+          echo "::group::🛑 Stopping Static Server"
+          echo "📊 Shutting down server (PID: $STATIC_SERVER_PID)"
+          
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            taskkill //F //PID "$STATIC_SERVER_PID" 2>/dev/null || true
+          else
+            kill "$STATIC_SERVER_PID" 2>/dev/null || true
+          fi
+          
+          echo "✅ Server stopped successfully"
+          echo "::endgroup::"
+        fi
