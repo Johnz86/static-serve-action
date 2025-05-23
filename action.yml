@@ -50,23 +50,23 @@ runs:
         echo "🌐 Host: ${{ inputs.host }}"
         
         # Determine platform
-        case "${{ runner.os }}-${{ runner.arch }}" in
+        case "$RUNNER_OS-$RUNNER_ARCH" in
           Linux-X64)     PLATFORM="linux-x64" ;;
           Linux-ARM64)   PLATFORM="linux-arm64" ;;
           macOS-X64)     PLATFORM="macos-x64" ;;
           macOS-ARM64)   PLATFORM="macos-arm64" ;;
           Windows-X64)   PLATFORM="windows-x64.exe" ;;
           *)
-            echo "::error::Unsupported platform: ${{ runner.os }}-${{ runner.arch }}"
+            echo "::error::Unsupported platform: $RUNNER_OS-$RUNNER_ARCH"
             exit 1
             ;;
         esac
         
-        BINARY_NAME="static-serve-action$([[ "${{ runner.os }}" == "Windows" ]] && echo ".exe" || echo "")"
-        TOOLS_DIR="${{ runner.temp }}/static-serve-action"
+        BINARY_NAME="static-serve-action$([[ "$RUNNER_OS" == "Windows" ]] && echo ".exe" || echo "")"
+        TOOLS_DIR="${RUNNER_TEMP}/static-serve-action"
         mkdir -p "$TOOLS_DIR"
         
-        echo "💻 Platform: ${{ runner.os }}-${{ runner.arch }} ($PLATFORM)"
+        echo "💻 Platform: $RUNNER_OS-$RUNNER_ARCH ($PLATFORM)"
         echo "🔨 Binary: $BINARY_NAME"
         
         echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
@@ -133,7 +133,7 @@ runs:
         
         # Quick sanity check
         sleep 0.5
-        if [[ "${{ runner.os }}" != "Windows" ]] && ! kill -0 "$SERVER_PID" 2>/dev/null; then
+        if [[ "$RUNNER_OS" != "Windows" ]] && ! kill -0 "$SERVER_PID" 2>/dev/null; then
           echo "::error::Server failed to start"
           exit 1
         fi
@@ -154,7 +154,7 @@ post:
           echo "::group::🛑 Stopping Static Server"
           echo "📊 Shutting down server (PID: $STATIC_SERVER_PID)"
           
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
             taskkill //F //PID "$STATIC_SERVER_PID" 2>/dev/null || true
           else
             kill "$STATIC_SERVER_PID" 2>/dev/null || true
